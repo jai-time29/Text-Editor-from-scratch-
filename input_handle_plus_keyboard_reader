@@ -1,0 +1,77 @@
+class KeyboardReader {
+public:
+    // Reads a single raw byte directly from the keyboard terminal buffer
+    static int readRawKey() {
+#ifdef _WIN32
+        return _getch();
+#else
+        struct termios oldt, newt;
+        int ch;
+        tcgetattr(STDIN_FILENO, &oldt);
+        newt = oldt;
+        newt.c_lflag &= ~(ICANON | ECHO); // Disable buffering and local echo
+        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+        ch = getchar();
+        tcsetattr(STDIN_FILENO, TCSANOW, &oldt); // Restore settings
+        return ch;
+#endif
+    }
+};
+
+
+
+
+class InputHandler {
+public:
+    static EditorCommand parseInput() {
+        int key = KeyboardReader::readRawKey();
+        EditorCommand cmd;
+        cmd.type = EditorCommandType::NONE;
+
+        // --- Step 4 & 8: Handle Special Key Escape Sequences (Unix Arrow Keys) ---
+        if (key == 27) { // Escape key hit
+            int next1 = KeyboardReader::readRawKey();
+            if (next1 == '[') {
+                int next2 = KeyboardReader::readRawKey();
+                switch (next2) {
+                    case 'A': cmd.type = EditorCommandType::MOVE_UP;    return cmd;
+                    case 'B': cmd.type = EditorCommandType::MOVE_DOWN;  return cmd;
+                    case 'C': cmd.type = EditorCommandType::MOVE_RIGHT; return cmd;
+                    case 'D': cmd.type = EditorCommandType::MOVE_LEFT;  return cmd;
+                }
+            }
+            return cmd;
+        }
+
+        // --- Step 7: Handle Control Key Bitmask Mappings ---
+        if (key == 19) { cmd.type = EditorCommandType::SAVE;   return cmd; } // CTRL+S (ASCII 19)
+        if (key == 26) { cmd.type = EditorCommandType::UNDO;   return cmd; } // CTRL+Z (ASCII 26)
+        if (key == 25) { cmd.type = EditorCommandType::REDO;   return cmd; } // CTRL+Y (ASCII 25)
+        if (key == 6)  { cmd.type = EditorCommandType::FIND;   return cmd; } // CTRL+F (ASCII 6)
+        if (key == 13) { cmd.type = EditorCommandType::OPEN;   return cmd; } // CTRL+M -> re-mapped for File Open
+        if (key == 17) { cmd.type = EditorCommandType::QUIT;   return cmd; } // CTRL+Q (ASCII 17)
+
+        // --- Step 8: Handle Backspace/Delete & Enter Mappings ---
+        if (key == 127 || key == 8) {
+            cmd.type = EditorCommandType::DELETE_CHARACTER;
+            return cmd;
+        }
+        if (key == '\n' || key == 10) {
+            cmd.type = EditorCommandType::PRESS_ENTER;
+            return cmd;
+        }
+        if (key == '\t' || key == 9) {
+            cmd.type = EditorCommandType::AUTOCOMPLETE;
+            return cmd;
+        }
+
+        // --- Step 3: Handle Regular Typable Text Character Input ---
+        if (key >= 32 && key <= 126) {
+            cmd.type = EditorCommandType::INSERT_CHARACTER;
+            cmd.payloadChar = static_cast<char>(key);
+            return cmd;
+        }
+
+        return cmd;
+    }
+};
