@@ -1,0 +1,143 @@
+//class gap buffer  object created
+class GapBuffer {
+    
+public:
+
+    std::vector<char> buffer;
+    int gapStart;
+    int gapEnd; // gapEnd is exclusive (points to the first character after the gap)
+
+    // Helper function to grow the buffer when it runs out of space
+    void resizeBuffer() {
+        int oldSize = buffer.size();
+        int newSize = oldSize * 2;
+        int gapLength = gapEnd - gapStart;
+        
+        // Resize the vector to the new capacity
+        buffer.resize(newSize);
+
+        // Shift everything after the gap to the very end of the new buffer
+        int elementsToShift = oldSize - gapEnd;
+        int newGapEnd = newSize - elementsToShift;
+
+        for (int i = elementsToShift - 1; i >= 0; --i) {
+            buffer[newGapEnd + i] = buffer[gapEnd + i];
+        }
+
+        // Update the gapEnd to its new position
+        gapEnd = newGapEnd;
+    }
+
+
+    // Step 1: Initialize the internal representation
+    GapBuffer(int initialCapacity = 8) {
+        buffer.resize(initialCapacity);
+        gapStart = 0;
+        gapEnd = initialCapacity;
+    }
+    // Splits the current buffer at the cursor (gapStart).
+// It keeps everything before the cursor, and returns a new GapBuffer with everything after.
+GapBuffer splitAtCursor() {
+    GapBuffer newLine;
+    
+    // Temporarily get everything after the gap
+    std::vector<char> remainingText;
+    for (int i = gapEnd; i < buffer.size(); ++i) {
+        remainingText.push_back(buffer[i]);
+    }
+    
+    // Clear the right side of the gap in this buffer
+    buffer.resize(gapStart);
+    gapEnd = gapStart; 
+    
+    // Insert the remaining text into the new line buffer
+    for (char c : remainingText) {
+        newLine.insert(c);
+    }
+    
+    // Move the new line's cursor to its beginning
+    while (newLine.gapStart > 0) {
+        newLine.moveLeft();
+    }
+    
+    return newLine;
+}
+
+    // Step 2: Implement insertion logic
+    void insert(char c) {
+        // If gapStart meets gapEnd, our gap is full! We must resize.
+        if (gapStart == gapEnd) {
+            resizeBuffer();
+        }
+
+        // Put character at the beginning of the gap
+        buffer[gapStart] = c;
+        // Move the start of the gap forward
+        gapStart++;
+    }
+    void insertString(const std::string& str) {
+    int strLen = str.length();
+
+    // 1. Ensure the gap is wide enough for the entire string
+    while ((gapEnd - gapStart) < strLen) {
+        resizeBuffer(); // Keep doubling until it fits
+    }
+
+    // 2. Copy the whole string into the gap
+    for (int i = 0; i < strLen; ++i) {
+        buffer[gapStart + i] = str[i];
+    }
+
+    // 3. Move gapStart forward by the length of the string
+    // The cursor is now at the end of the newly inserted string
+    gapStart += strLen;
+    }
+
+    // Step 4: Implement deletion (Backspace)
+    void deleteChar() {
+        // We can only delete if there is text to the left of the gap
+        if (gapStart > 0) {
+            // Moving gapStart back effectively "swallows" the character into the gap
+            gapStart--;
+        }
+    }
+
+    // Step 3: Implement cursor movement (Left Arrow)
+    void moveLeft() {
+        // Can only move left if there is text to the left of the gap
+        if (gapStart > 0) {
+            // Move character from left side of gap to the right side of gap
+            gapStart--;
+            gapEnd--;
+            buffer[gapEnd] = buffer[gapStart];
+        }
+    }
+
+    // Step 3: Implement cursor movement (Right Arrow)
+    void moveRight() {
+        // Can only move right if there is text to the right of the gap
+        if (gapEnd < buffer.size()) {
+            // Move character from right side of gap to the left side of gap
+            buffer[gapStart] = buffer[gapEnd];
+            gapStart++;
+            gapEnd++;
+        }
+    }
+
+    // Dynamic text retrieval for testing
+    std::string getText() {
+        std::string result = "";
+        
+        // 1. Grab everything before the gap
+        for (int i = 0; i < gapStart; ++i) {
+            result += buffer[i];
+        }
+        
+        // 2. Grab everything after the gap
+        for (int i = gapEnd; i < buffer.size(); ++i) {
+            result += buffer[i];
+        }
+        
+        return result;
+    }
+};
